@@ -1,0 +1,5 @@
+<library path="nav2_human_aware_planner_plugin">
+	<class name="nav2_human_aware_planner/HumanAware" type="nav2_human_aware_planner::HumanAware" base_class_type="nav2_core::GlobalPlanner">
+	  <description>Plugin which produces human aware paths according to a seperate path pub node.</description>
+	</class>
+</library>

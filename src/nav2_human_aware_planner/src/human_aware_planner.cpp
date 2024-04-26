@@ -43,12 +43,12 @@
 #include <memory>
 #include "nav2_util/node_utils.hpp"
 
-#include "nav2_straightline_planner/straight_line_planner.hpp"
+#include "nav2_human_aware_planner/human_aware_planner.hpp"
 
-namespace nav2_straightline_planner
+namespace nav2_human_aware_planner
 {
 
-void StraightLine::configure(
+void HumanAware::configure(
   const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
   std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros)
@@ -62,7 +62,7 @@ void StraightLine::configure(
   // START Subscription to path topic
   path_sub_ = node_->create_subscription<nav_msgs::msg::Path>(
       "/custom_path", rclcpp::SensorDataQoS(),
-      std::bind(&StraightLine::pathCallback, this, std::placeholders::_1));
+      std::bind(&HumanAware::pathCallback, this, std::placeholders::_1));
 
   RCLCPP_INFO(node_->get_logger(),
               "StraighLine: subscribed to "
@@ -78,7 +78,7 @@ void StraightLine::configure(
   node_->get_parameter(name_ + ".interpolation_resolution", interpolation_resolution_);
 }
 
-void StraightLine::pathCallback(
+void HumanAware::pathCallback(
       const nav_msgs::msg::Path::SharedPtr msg)
   {
     path_message_mutex_.lock();
@@ -90,28 +90,28 @@ void StraightLine::pathCallback(
     path_received = true;
   }
 
-void StraightLine::cleanup()
+void HumanAware::cleanup()
 {
   RCLCPP_INFO(
     node_->get_logger(), "CleaningUp plugin %s of type NavfnPlanner",
     name_.c_str());
 }
 
-void StraightLine::activate()
+void HumanAware::activate()
 {
   RCLCPP_INFO(
     node_->get_logger(), "Activating plugin %s of type NavfnPlanner",
     name_.c_str());
 }
 
-void StraightLine::deactivate()
+void HumanAware::deactivate()
 {
   RCLCPP_INFO(
     node_->get_logger(), "Deactivating plugin %s of type NavfnPlanner",
     name_.c_str());
 }
 
-nav_msgs::msg::Path StraightLine::createPlan(
+nav_msgs::msg::Path HumanAware::createPlan(
   const geometry_msgs::msg::PoseStamped & start,
   const geometry_msgs::msg::PoseStamped & goal)
 {
@@ -183,7 +183,7 @@ nav_msgs::msg::Path StraightLine::createPlan(
   return global_path;
 }
 
-}  // namespace nav2_straightline_planner
+}  // namespace nav2_human_aware_planner
 
 #include "pluginlib/class_list_macros.hpp"
-PLUGINLIB_EXPORT_CLASS(nav2_straightline_planner::StraightLine, nav2_core::GlobalPlanner)
+PLUGINLIB_EXPORT_CLASS(nav2_human_aware_planner::HumanAware, nav2_core::GlobalPlanner)

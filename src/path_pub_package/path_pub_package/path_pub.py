@@ -13,6 +13,8 @@ class MapSolver(Node):
 
         self.path_pub = self.create_publisher(Path, 'custom_path', 10)
 
+        # TODO: Add subscribers to the current turtlebot pose and the nav goal so we can do our path planning that way
+
 
     def pubPath(self):
         start_x = -2.0
