@@ -60,16 +60,23 @@ class AStarMapSolver(Node):
 
         # self.vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-        # self.path_pub = self.create_publisher(Path, 'custom_path', 10)
+        self.path_pub = self.create_publisher(Path, 'custom_path', 10)
 
         # Define the map colors
-        self.map_colors = {"obstacle": [0, 0, 255],
-                           "clearance": [0, 255, 0],
-                           "unexplored": [0, 0, 0],
-                           "explored": [255, 0, 0],
-                           "path": [255, 255, 255],
-                           "start": [0, 255, 255],
-                           "goal": [255, 0, 255]}
+        self.map_colors = {"obstacle": [0, 0, 127], # Dark Red
+                           "clearance": [0, 255, 0], # Green
+                           "unexplored": [0, 0, 0], # Black
+                           "explored": [255, 0, 0], # Blue
+                           "path": [255, 255, 255], # White
+                           "start": [0, 255, 255], # Yellow
+                           "goal": [255, 0, 255], # Purple
+                           "human_obstacle": [0, 0, 255], # Bright Red
+                           "human_space": [0, 165, 255], # Orange
+                           "human_view": [203, 192, 255] # pink 
+                        }  
+        
+        # HUMAN AWARE PARAMS
+        self.human_comfort_rad = 75
         
         self.map_dim = (400, 800)
 
@@ -93,29 +100,34 @@ class AStarMapSolver(Node):
         self.use_lines = use_lines
         
         # Clearance in milimeters
-        while True:
-            self.clearance = int(input("Enter the clearance value in mm (0-10 recommended): "))
+        # while True:
+        #     self.clearance = int(input("Enter the clearance value in mm (0-10 recommended): "))
             
-            if self.clearance < 0 or self.clearance > 10:
-                continue
-            else:
-                break
+        #     if self.clearance < 0 or self.clearance > 10:
+        #         continue
+        #     else:
+        #         break
+
+        self.clearance = 2
             
         # Get the two rpms from the user
-        while True:
-            self.rpm1 = int(input("Enter the first rpm (30-70 recommended): "))
+        # while True:
+        #     self.rpm1 = int(input("Enter the first rpm (30-70 recommended): "))
             
-            if self.rpm1 < 0 or self.rpm1> 100:
-                continue
-            else:
-                break
-        while True:
-            self.rpm2 = int(input("Enter the second rpm (30-70 recommended): "))
+        #     if self.rpm1 < 0 or self.rpm1> 100:
+        #         continue
+        #     else:
+        #         break
+        # while True:
+        #     self.rpm2 = int(input("Enter the second rpm (30-70 recommended): "))
             
-            if self.rpm2 < 0 or self.rpm2> 100:
-                continue
-            else:
-                break
+        #     if self.rpm2 < 0 or self.rpm2> 100:
+        #         continue
+        #     else:
+        #         break
+
+        self.rpm1 = 30
+        self.rpm2 = 70
             
         # Robot geometric params
         self.robot_wheel_rad = 3.3 #0.033
@@ -262,10 +274,71 @@ class AStarMapSolver(Node):
                                       thickness=-1, 
                                       color=self.map_colors["obstacle"])
         
+        # Person 1
+        top_left = (390, 290)
+        bottom_right = (410, 310)
+        center = (int((top_left[0] + bottom_right[0])/2), int((top_left[1] + bottom_right[1])/2))
+
+        # Draw the human comfort circle
+        obstacle_map = cv2.circle(obstacle_map, 
+                                  center,
+                                  self.human_comfort_rad,
+                                  color=self.map_colors["human_space"],
+                                  thickness=-1)
+        
+        # TODO: Add in human vision half circle
+
+        # First draw the clearance rectangle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0]-self.clearance, top_left[1] - self.clearance), 
+                                     (bottom_right[0] + self.clearance, bottom_right[1] + self.clearance),
+                                      thickness=-1, 
+                                      color=self.map_colors["clearance"])
+        
+        # Draw the actual obstacle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0], top_left[1]), 
+                                     (bottom_right[0], bottom_right[1]),
+                                      thickness=-1, 
+                                      color=self.map_colors["human_obstacle"])
+        
+
+        # Person 2
+        top_left = (590, 190)
+        bottom_right = (610, 210)
+        center = (int((top_left[0] + bottom_right[0])/2), int((top_left[1] + bottom_right[1])/2))
+
+        # Draw the human comfort circle
+        obstacle_map = cv2.circle(obstacle_map, 
+                                  center,
+                                  self.human_comfort_rad,
+                                  color=self.map_colors["human_space"],
+                                  thickness=-1)
+
+        # First draw the clearance rectangle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0]-self.clearance, top_left[1] - self.clearance), 
+                                     (bottom_right[0] + self.clearance, bottom_right[1] + self.clearance),
+                                      thickness=-1, 
+                                      color=self.map_colors["clearance"])
+        
+        # Draw the actual obstacle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0], top_left[1]), 
+                                     (bottom_right[0], bottom_right[1]),
+                                      thickness=-1, 
+                                      color=self.map_colors["human_obstacle"])
+        
         # cv2.imshow("Map", obstacle_map)
         # cv2.waitKey(0)
         
         return obstacle_map
+    
+    # TODO: Make the same size as the normal map and have it just include the pure cost of human spaces
+    # Maybe have the color scale from green to red as it goes higher for a visual?
+    # At the edge its (0, 255, 0) then goes (0, 254, 1) all the way to (0, 0, 255) at the center
+    def makeHumanCostMap():
+        pass
     
     # Gets the start and end point from user input and stores them
     def getStartAndGoalInput(self):
@@ -302,15 +375,17 @@ class AStarMapSolver(Node):
             else:
                 break
 
-        while True:
-            self.step_size = int(input("Please enter a step size value between 1 and 3: "))
+        # while True:
+        #     self.step_size = int(input("Please enter a step size value between 1 and 3: "))
 
-            if self.step_size < 1 or self.step_size > 3:
-                print("Invalid step size")
-            else:
-                # Multiply step by 2 to account for the larger map
-                self.step_size *= 2
-                break
+        #     if self.step_size < 1 or self.step_size > 3:
+        #         print("Invalid step size")
+        #     else:
+        #         # Multiply step by 2 to account for the larger map
+        #         self.step_size *= 2
+        #         break
+
+        self.step_size = 4
             
         self.goal_node = (goal_y, goal_x, goal_theta)
             
@@ -579,10 +654,64 @@ class AStarMapSolver(Node):
 
         if self.record:
             self.video_rec.release()
-        
+
         show_map = cv2.resize(self.draw_map, (int(self.map_dim[1]), int(self.map_dim[0])))
         cv2.imshow("Exploration map", show_map)
         cv2.waitKey(0)
+
+        # Create blank path message
+        path_msg = Path()
+        path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.frame_id = 'map'
+
+        waypoints = []
+
+        for idx, (pix_y, pix_x, ang) in enumerate(self.path_pixels):
+            # Convert the pixel coordinates to real world coordinates
+            x = pix_x/100
+            y = (self.map_dim[0] - pix_y)/100 # Need to subtract from the map y because opencv's coorinate system starts in the upper left
+
+
+            # TODO: Something is messed up in either the angle calculation or the quaternion calculation
+            roll = 0
+            pitch = 0
+            if idx == 0:
+                yaw = ang
+            else:
+                prev_y = self.path_pixels[idx - 1][0]
+                prex_x = self.path_pixels[idx - 1][1]
+
+                yaw = math.atan2((y-prev_y), (x-prex_x))
+
+
+            # Convert to quaternion
+            q_x = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+            q_y = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+            q_z = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+            q_w = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+
+            pose_stamped = PoseStamped()
+            # pose_stamped.header.stamp = self.get_clock().now().to_msg()
+            # pose_stamped.header.frame_id = 'map'  # Set the frame ID
+            pose_stamped.pose.position.x = x  # Set x-coordinate
+            pose_stamped.pose.position.y = y  # Set y-coordinate
+            pose_stamped.pose.position.z = 0.0   # Set z-coordinate
+
+            # Populate orientation part of message
+            pose_stamped.pose.orientation.x = q_x
+            pose_stamped.pose.orientation.y = q_y
+            pose_stamped.pose.orientation.z = q_z
+            pose_stamped.pose.orientation.w = q_w
+
+            waypoints.append(pose_stamped)
+        # Populate the Path message with the waypoints
+        path_msg.poses = waypoints
+
+        print("Publishing")
+        # print(path_msg)
+
+        # Publish the Path message
+        self.path_pub.publish(path_msg)
 
         # Loop through the saved path commands and execute each one of them
         # TODO: Replace this with the custom path pub
