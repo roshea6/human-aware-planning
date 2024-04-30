@@ -77,6 +77,10 @@ class AStarMapSolver(Node):
         
         # HUMAN AWARE PARAMS
         self.human_comfort_rad = 75
+        self.human_vision_rad = 120
+        self.human_comfort_scale = 2
+        self.human_vision_scale = 1.5
+        self.human_fov = 120
         
         self.map_dim = (400, 800)
 
@@ -108,7 +112,7 @@ class AStarMapSolver(Node):
         #     else:
         #         break
 
-        self.clearance = 2
+        self.clearance = 5
             
         # Get the two rpms from the user
         # while True:
@@ -223,10 +227,78 @@ class AStarMapSolver(Node):
         # cv2.imshow("Blank", blank_map)
         # cv2.waitKey(0)
         
+        # Person 1
+        top_left = (390, 290)
+        bottom_right = (410, 310)
+        center = (int((top_left[0] + bottom_right[0])/2), int((top_left[1] + bottom_right[1])/2))
+        
+        # Add in human vision half circle
+        axes = (self.human_vision_rad, self.human_vision_rad)
+        angle = -30
+        startAngle = 0
+        endAngle = (360-self.human_fov)
+
+        obstacle_map = cv2.ellipse(blank_map, center, axes, angle, startAngle, endAngle, color=self.map_colors["human_view"], thickness=-1)
+
+
+        # Draw the human comfort circle
+        obstacle_map = cv2.circle(obstacle_map, 
+                                  center,
+                                  self.human_comfort_rad,
+                                  color=self.map_colors["human_space"],
+                                  thickness=-1)
+        
+
+        # First draw the clearance rectangle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0]-self.clearance, top_left[1] - self.clearance), 
+                                     (bottom_right[0] + self.clearance, bottom_right[1] + self.clearance),
+                                      thickness=-1, 
+                                      color=self.map_colors["clearance"])
+        
+        # Draw the actual obstacle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0], top_left[1]), 
+                                     (bottom_right[0], bottom_right[1]),
+                                      thickness=-1, 
+                                      color=self.map_colors["human_obstacle"])
+        
+
+        # Person 2
+        top_left = (590, 190)
+        bottom_right = (610, 210)
+        center = (int((top_left[0] + bottom_right[0])/2), int((top_left[1] + bottom_right[1])/2))
+
+        axes = (self.human_vision_rad, self.human_vision_rad)
+        angle = 60
+        startAngle = 0
+        endAngle = (360-self.human_fov)
+        cv2.ellipse(obstacle_map, center, axes, angle, startAngle, endAngle, color=self.map_colors["human_view"], thickness=-1)
+
+        # Draw the human comfort circle
+        obstacle_map = cv2.circle(obstacle_map, 
+                                  center,
+                                  self.human_comfort_rad,
+                                  color=self.map_colors["human_space"],
+                                  thickness=-1)
+
+        # First draw the clearance rectangle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0]-self.clearance, top_left[1] - self.clearance), 
+                                     (bottom_right[0] + self.clearance, bottom_right[1] + self.clearance),
+                                      thickness=-1, 
+                                      color=self.map_colors["clearance"])
+        
+        # Draw the actual obstacle
+        obstacle_map = cv2.rectangle(obstacle_map, 
+                                     (top_left[0], top_left[1]), 
+                                     (bottom_right[0], bottom_right[1]),
+                                      thickness=-1, 
+                                      color=self.map_colors["human_obstacle"])
         
         # Border edges
         # Left wall
-        obstacle_map = cv2.rectangle(blank_map, 
+        obstacle_map = cv2.rectangle(obstacle_map, 
                                      (0, 0), 
                                      (self.clearance, self.map_dim[1] - self.clearance), 
                                      color=self.map_colors["clearance"], 
@@ -273,61 +345,6 @@ class AStarMapSolver(Node):
                                      (bottom_right[0], bottom_right[1]),
                                       thickness=-1, 
                                       color=self.map_colors["obstacle"])
-        
-        # Person 1
-        top_left = (390, 290)
-        bottom_right = (410, 310)
-        center = (int((top_left[0] + bottom_right[0])/2), int((top_left[1] + bottom_right[1])/2))
-
-        # Draw the human comfort circle
-        obstacle_map = cv2.circle(obstacle_map, 
-                                  center,
-                                  self.human_comfort_rad,
-                                  color=self.map_colors["human_space"],
-                                  thickness=-1)
-        
-        # TODO: Add in human vision half circle
-
-        # First draw the clearance rectangle
-        obstacle_map = cv2.rectangle(obstacle_map, 
-                                     (top_left[0]-self.clearance, top_left[1] - self.clearance), 
-                                     (bottom_right[0] + self.clearance, bottom_right[1] + self.clearance),
-                                      thickness=-1, 
-                                      color=self.map_colors["clearance"])
-        
-        # Draw the actual obstacle
-        obstacle_map = cv2.rectangle(obstacle_map, 
-                                     (top_left[0], top_left[1]), 
-                                     (bottom_right[0], bottom_right[1]),
-                                      thickness=-1, 
-                                      color=self.map_colors["human_obstacle"])
-        
-
-        # Person 2
-        top_left = (590, 190)
-        bottom_right = (610, 210)
-        center = (int((top_left[0] + bottom_right[0])/2), int((top_left[1] + bottom_right[1])/2))
-
-        # Draw the human comfort circle
-        obstacle_map = cv2.circle(obstacle_map, 
-                                  center,
-                                  self.human_comfort_rad,
-                                  color=self.map_colors["human_space"],
-                                  thickness=-1)
-
-        # First draw the clearance rectangle
-        obstacle_map = cv2.rectangle(obstacle_map, 
-                                     (top_left[0]-self.clearance, top_left[1] - self.clearance), 
-                                     (bottom_right[0] + self.clearance, bottom_right[1] + self.clearance),
-                                      thickness=-1, 
-                                      color=self.map_colors["clearance"])
-        
-        # Draw the actual obstacle
-        obstacle_map = cv2.rectangle(obstacle_map, 
-                                     (top_left[0], top_left[1]), 
-                                     (bottom_right[0], bottom_right[1]),
-                                      thickness=-1, 
-                                      color=self.map_colors["human_obstacle"])
         
         # cv2.imshow("Map", obstacle_map)
         # cv2.waitKey(0)
