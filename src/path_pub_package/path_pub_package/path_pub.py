@@ -12,48 +12,6 @@ import math
 import copy
 from queue import PriorityQueue
 
-# class MapSolver(Node):
-#     def __init__(self):
-#         super().__init__('navigation_node')
-
-#         self.path_pub = self.create_publisher(Path, 'custom_path', 10)
-
-#         # TODO: Add subscribers to the current turtlebot pose and the nav goal so we can do our path planning that way
-
-
-#     def pubPath(self):
-#         start_x = -2.0
-#         end_x = 1.0
-#         start_y = -0.5
-#         end_y = -0.5
-
-#         int_x = np.linspace(start_x, end_x, 25)
-#         int_y = np.linspace(start_y, end_y, 25)
-
-#         # Create blank path message
-#         path_msg = Path()
-#         path_msg.header.stamp = self.get_clock().now().to_msg()
-#         path_msg.header.frame_id = 'map'
-
-#         waypoints = []
-
-#         for (x, y) in zip(int_x, int_y):
-#             pose_stamped = PoseStamped()
-#             # pose_stamped.header.stamp = self.get_clock().now().to_msg()
-#             # pose_stamped.header.frame_id = 'map'  # Set the frame ID
-#             pose_stamped.pose.position.x = x  # Set x-coordinate
-#             pose_stamped.pose.position.y = y  # Set y-coordinate
-#             pose_stamped.pose.position.z = 0.0   # Set z-coordinate
-#             waypoints.append(pose_stamped)
-#         # Populate the Path message with the waypoints
-#         path_msg.poses = waypoints
-
-#         print("Publishing")
-#         # print(path_msg)
-
-#         # Publish the Path message
-#         self.path_pub.publish(path_msg)
-
 class AStarMapSolver(Node):
     def __init__(self, record_video=False, c2g_weight=1, use_lines=False, save_every_n_frames=500):
         super().__init__('a_star_navigation_node')
@@ -76,11 +34,16 @@ class AStarMapSolver(Node):
                         }  
         
         # HUMAN AWARE PARAMS
-        self.human_comfort_rad = 75
-        self.human_vision_rad = 120
-        self.human_comfort_scale = 2
-        self.human_vision_scale = 1.5
+        self.human_comfort_rad = 100
+        self.human_vision_rad = 60
+        self.human_vis_offset = 70
+        self.min_human_comfort_scale = 1.0
+        self.max_human_comfort_scale = 1.5
+        self.min_human_vision_scale = 1.0
+        self.max_human_vision_scale = 1.05
+        self.num_cost_rings = 5
         self.human_fov = 120
+
         
         self.map_dim = (400, 800)
 
@@ -223,6 +186,10 @@ class AStarMapSolver(Node):
     def makeMap(self):
         # Make an all black map to start
         blank_map = np.zeros((self.map_dim[0], self.map_dim[1], 3), np.uint8)
+        
+        # Make a cost map of 1s to represent multipliers
+        self.human_prox_cost_map = np.ones((self.map_dim[0], self.map_dim[1]), np.uint8)
+        self.human_vis_cost_map = np.ones((self.map_dim[0], self.map_dim[1]), np.uint8)
 
         # cv2.imshow("Blank", blank_map)
         # cv2.waitKey(0)
@@ -238,15 +205,52 @@ class AStarMapSolver(Node):
         startAngle = 0
         endAngle = (360-self.human_fov)
 
-        obstacle_map = cv2.ellipse(blank_map, center, axes, angle, startAngle, endAngle, color=self.map_colors["human_view"], thickness=-1)
-
-
+        # obstacle_map = cv2.ellipse(blank_map, center, axes, angle, startAngle, endAngle, color=self.map_colors["human_view"], thickness=-1)
         # Draw the human comfort circle
-        obstacle_map = cv2.circle(obstacle_map, 
+        obstacle_map = cv2.circle(blank_map, 
                                   center,
                                   self.human_comfort_rad,
                                   color=self.map_colors["human_space"],
                                   thickness=-1)
+
+        # Draw the human vision circle
+        obstacle_map = cv2.circle(obstacle_map, 
+                                  (center[0], center[1] + self.human_vis_offset),
+                                  self.human_vision_rad,
+                                  color=self.map_colors["human_view"],
+                                  thickness=-1)
+        
+        # Draw the concentric human comfort cost circles on the proximity cost map
+        ring_rads = np.linspace(0, self.human_comfort_rad, self.num_cost_rings + 1)
+        
+        # Convert to ints, drop the first one, and reverse so we start with the biggest ring
+        ring_rads = [int(rad) for rad in ring_rads][1:]
+        ring_rads.reverse()
+
+        # Calculates the cost step size increase between rings
+        self.human_prox_cost_inc = (self.max_human_comfort_scale - self.min_human_comfort_scale)/self.num_cost_rings
+        self.human_vis_cost_inc = (self.max_human_vision_scale - self.min_human_vision_scale)/self.num_cost_rings
+
+        # Draw the concentric human comfort cost circles on the proximity cost map
+        vis_ring_rads = np.linspace(0, self.human_vision_rad, self.num_cost_rings + 1)
+        
+        # Convert to ints, drop the first one, and reverse so we start with the biggest ring
+        vis_ring_rads = [int(rad) for rad in vis_ring_rads][1:]
+        vis_ring_rads.reverse()
+
+        # Add human prox cost and vis cost rings for first person
+        for idx, (prox_rad, vis_rad) in enumerate(zip(ring_rads, vis_ring_rads)):
+            cv2.circle(self.human_prox_cost_map, 
+                        center,
+                        prox_rad,
+                        color=(idx+1)*25,
+                        thickness=-1)
+            
+            cv2.circle(self.human_vis_cost_map, 
+                        (center[0], center[1] + self.human_vis_offset),
+                        vis_rad,
+                        color=(idx+1)*25,
+                        thickness=-1)
         
 
         # First draw the clearance rectangle
@@ -273,14 +277,42 @@ class AStarMapSolver(Node):
         angle = 60
         startAngle = 0
         endAngle = (360-self.human_fov)
-        cv2.ellipse(obstacle_map, center, axes, angle, startAngle, endAngle, color=self.map_colors["human_view"], thickness=-1)
-
+        # cv2.ellipse(obstacle_map, center, axes, angle, startAngle, endAngle, color=self.map_colors["human_view"], thickness=-1)
         # Draw the human comfort circle
         obstacle_map = cv2.circle(obstacle_map, 
                                   center,
                                   self.human_comfort_rad,
                                   color=self.map_colors["human_space"],
                                   thickness=-1)
+
+        # Draw the human vision circle
+        obstacle_map = cv2.circle(obstacle_map, 
+                                  (center[0] - self.human_vis_offset, center[1]),
+                                  self.human_vision_rad,
+                                  color=self.map_colors["human_view"],
+                                  thickness=-1)
+        
+        # Add human prox cost rings for second person
+        for idx, (prox_rad, vis_rad) in enumerate(zip(ring_rads, vis_ring_rads)):
+            cv2.circle(self.human_prox_cost_map, 
+                        center,
+                        prox_rad,
+                        color=(idx+1)*25,
+                        thickness=-1)
+            
+            cv2.circle(self.human_vis_cost_map, 
+                        (center[0] - self.human_vis_offset, center[1]),
+                        vis_rad,
+                        color=(idx+1)*25,
+                        thickness=-1)
+        
+        # cv2.imshow("Human Proxity Cost Field", self.human_prox_cost_map)
+        # cv2.imshow("Human Vision Cost Field", self.human_vis_cost_map)
+        # cv2.waitKey(0)
+        # cv2.imwrite("./src/path_pub_package/output_imgs/Human_proximity_cost_field.png", self.human_prox_cost_map)
+        # cv2.imwrite("./src/path_pub_package/output_imgs/Human_vision_cost_field.png", self.human_vis_cost_map)
+        # exit()
+
 
         # First draw the clearance rectangle
         obstacle_map = cv2.rectangle(obstacle_map, 
@@ -482,10 +514,20 @@ class AStarMapSolver(Node):
 
             # Calculate the cost to come as the euclidian distance between the ne config and the goal config
             cost_to_go = math.sqrt((self.goal_node[0] - new_loc[0])**2 + (self.goal_node[1] - new_loc[1])**2)
+
+            # Multiply the cost to go value by the human cost scaling factors
+            human_prox_scaling = 1 + ((self.human_prox_cost_map[new_loc[0]][new_loc[1]]-1) * self.human_prox_cost_inc)
+            human_vis_scaling = 1 + ((self.human_vis_cost_map[new_loc[0]][new_loc[1]]-1) * self.human_vis_cost_inc)
+
+            cost_to_come *= human_prox_scaling*human_vis_scaling
+
+            # print(cost_to_go)
             
             # print("Cost to come: {}".format(cost_to_come))
             # print("Cost to go: {}".format(cost_to_go))
 
+
+            # TODO: Add in human cost here
             total_cost = self.c2g_weight*cost_to_go + cost_to_come 
             
             # Check if the configuration is in the list of working configs and grab it's current cost if it is
@@ -556,7 +598,11 @@ class AStarMapSolver(Node):
             pix_loc = prev_node[2]
             move = prev_node[5]
             
-            # print(pix_loc)
+            # total_cost = prev_node[0]
+            # c2c = prev_node[4]
+
+            # print("Cost 2 Come: {}".format(c2c))
+            # print("Total cost: {}".format(total_cost))
             
             # Save the pixel so we can trace it later
             self.path_pixels.append(pix_loc)
@@ -730,41 +776,7 @@ class AStarMapSolver(Node):
         # Publish the Path message
         self.path_pub.publish(path_msg)
 
-        # Loop through the saved path commands and execute each one of them
-        # TODO: Replace this with the custom path pub
-        # for command in self.path_commands:
-        #     # Extract the individual velocity components
-        #     # Convert from mm to m
-        #     x_vel = -command[0]/(14000)
-        #     y_vel = command[1]/(14000)
-        #     ang_vel = -self.deg2rad(command[2]*7)
-
-        #     # print(command)
-
-        #     total_vel = math.sqrt(x_vel**2 + y_vel**2)
-
-        #     # Create a blank message and populate it
-        #     twist_msg = Twist()
-
-        #     twist_msg.linear.x = total_vel
-        #     # twist_msg.linear.y = y_vel
-        #     twist_msg.angular.z = ang_vel
-
-        #     # print(twist_msg)
-
-        #     print("(X Vel: {}, Ang Vel: {})".format(total_vel, ang_vel))
-
-        #     self.vel_pub.publish(twist_msg)
-
-        #     time.sleep(self.timestep*110)
-
-        # # Create a final message with 0 vel and publish it to stop the robot
-        # twist_msg = Twist()
-
-        # twist_msg.linear.x = 0.0
-        # twist_msg.angular.z = 0.0
-
-        # self.vel_pub.publish(twist_msg)
+        
 
 def main(args=None):
     # rclpy.init(args=args)
@@ -776,7 +788,7 @@ def main(args=None):
     #     rclpy.shutdown()
 
     rclpy.init(args=args)
-    node = AStarMapSolver(record_video=True, c2g_weight=2, use_lines=True, save_every_n_frames=100)
+    node = AStarMapSolver(record_video=True, c2g_weight=3, use_lines=True, save_every_n_frames=10)
     try:
         node.findPath()
     finally:
