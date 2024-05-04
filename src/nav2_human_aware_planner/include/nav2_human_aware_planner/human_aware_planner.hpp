@@ -1,5 +1,5 @@
 /*********************************************************************
- *
+ * Author: Ryan O'Shea
  * Based off HumanAware planner tutorial from
  * https://navigation.ros.org/tutorials/docs/writing_new_nav2planner_plugin.html
  *********************************************************************/
@@ -68,11 +68,13 @@ private:
 
   nav_msgs::msg::Path path_list_;
 
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr start_pub;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pub;
 
   void pathCallback(const nav_msgs::msg::Path::SharedPtr msg);
 
-    std::mutex path_message_mutex_;
-    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
+  std::mutex path_message_mutex_;
+  rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
 
     // std::unique_ptr<nav2_costmap_2d::Costmap2DPublisher> costmap_pub_;
 };

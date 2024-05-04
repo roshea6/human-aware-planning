@@ -38,9 +38,9 @@ class AStarMapSolver(Node):
         self.human_vision_rad = 60
         self.human_vis_offset = 70
         self.min_human_comfort_scale = 1.0
-        self.max_human_comfort_scale = 1.5
+        self.max_human_comfort_scale = 1.0
         self.min_human_vision_scale = 1.0
-        self.max_human_vision_scale = 1.05
+        self.max_human_vision_scale = 1.0
         self.num_cost_rings = 5
         self.human_fov = 120
 
@@ -377,7 +377,7 @@ class AStarMapSolver(Node):
                                      (bottom_right[0], bottom_right[1]),
                                       thickness=-1, 
                                       color=self.map_colors["obstacle"])
-        
+        # TODO: Add in conditional waitkey here o we can use snipping tool to grab the map
         # cv2.imshow("Map", obstacle_map)
         # cv2.waitKey(0)
         
