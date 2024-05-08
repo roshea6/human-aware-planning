@@ -38,9 +38,9 @@ class AStarMapSolver(Node):
         self.human_vision_rad = 60
         self.human_vis_offset = 70
         self.min_human_comfort_scale = 1.0
-        self.max_human_comfort_scale = 1.0
+        self.max_human_comfort_scale = 1.2
         self.min_human_vision_scale = 1.0
-        self.max_human_vision_scale = 1.0
+        self.max_human_vision_scale = 1.1
         self.num_cost_rings = 5
         self.human_fov = 120
 
@@ -460,6 +460,11 @@ class AStarMapSolver(Node):
             new_x = int(self.search_loc_thresh * round(new_x/self.search_loc_thresh))
             new_y = start_pixel[1] + self.step_size*y_vel*self.timestep
             new_y = int(self.search_loc_thresh * round(new_y/self.search_loc_thresh))
+
+            # TODO: Here we could add the check to see if the new pixel and the previous pixel are connected
+            # TODO: In the map making function create a set if acceptable nodes within the prm then check if the node exists
+            # TODO: Also create a dictionary that has the n nearest neighbors for each node
+            # Technically we should just search that graph but it's much too late to rewrite the entire codebase
             
             ang_vel = self.robot_wheel_rad/self.robot_wheel_dist * (move[1] - move[0])
 
