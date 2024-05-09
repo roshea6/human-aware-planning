@@ -34,13 +34,13 @@ class AStarMapSolver(Node):
                         }  
         
         # HUMAN AWARE PARAMS
-        self.human_comfort_rad = 100
-        self.human_vision_rad = 60
+        self.human_comfort_rad = 80
+        self.human_vision_rad = 40
         self.human_vis_offset = 70
         self.min_human_comfort_scale = 1.0
-        self.max_human_comfort_scale = 1.2
+        self.max_human_comfort_scale = 1.02
         self.min_human_vision_scale = 1.0
-        self.max_human_vision_scale = 1.1
+        self.max_human_vision_scale = 1.01
         self.num_cost_rings = 5
         self.human_fov = 120
 
@@ -793,7 +793,7 @@ def main(args=None):
     #     rclpy.shutdown()
 
     rclpy.init(args=args)
-    node = AStarMapSolver(record_video=True, c2g_weight=3, use_lines=True, save_every_n_frames=10)
+    node = AStarMapSolver(record_video=False, c2g_weight=2, use_lines=True, save_every_n_frames=10)
     try:
         node.findPath()
     finally:
