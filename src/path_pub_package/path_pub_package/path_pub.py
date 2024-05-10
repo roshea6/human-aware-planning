@@ -11,9 +11,11 @@ import time
 import math
 import copy
 from queue import PriorityQueue
+from sklearn.neighbors import NearestNeighbors
+import random
 
 class AStarMapSolver(Node):
-    def __init__(self, record_video=False, c2g_weight=1, use_lines=False, save_every_n_frames=500):
+    def __init__(self, record_video=False, c2g_weight=1, use_lines=False, save_every_n_frames=500, use_prm=False):
         super().__init__('a_star_navigation_node')
 
         # self.vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
@@ -43,6 +45,8 @@ class AStarMapSolver(Node):
         self.max_human_vision_scale = 1.01
         self.num_cost_rings = 5
         self.human_fov = 120
+
+        self.use_prm = use_prm
 
         
         self.map_dim = (400, 800)
@@ -377,17 +381,36 @@ class AStarMapSolver(Node):
                                      (bottom_right[0], bottom_right[1]),
                                       thickness=-1, 
                                       color=self.map_colors["obstacle"])
-        # TODO: Add in conditional waitkey here o we can use snipping tool to grab the map
+        
+        # Generate n accpetable nodes and connect them after clusting them
+        if self.use_prm:
+            self.prm_array = set()
+            for i in range(3000):
+                x = random.randint(30, self.map_dim[0] - 30)
+                y = random.randint(30, self.map_dim[1] - 30)
+
+                x = int(self.search_loc_thresh * round(x/(self.search_loc_thresh)))
+                y = int(self.search_loc_thresh * round(y/(self.search_loc_thresh)))
+
+                if list(obstacle_map[x, y]) == self.map_colors["obstacle"] or list([x, y]) == self.map_colors["clearance"]:
+                    continue
+
+                else:
+                    self.prm_array.add(str([y, x]))
+
+                obstacle_map = cv2.circle(obstacle_map, 
+                    (y, x),
+                    4,
+                    color=(255, 255, 255),
+                    thickness=-1)
+
         # cv2.imshow("Map", obstacle_map)
-        # cv2.waitKey(0)
+        # while not cv2.waitKey(0) == ord("q"):
+        #     print("nope")
+
+        # exit()
         
         return obstacle_map
-    
-    # TODO: Make the same size as the normal map and have it just include the pure cost of human spaces
-    # Maybe have the color scale from green to red as it goes higher for a visual?
-    # At the edge its (0, 255, 0) then goes (0, 254, 1) all the way to (0, 0, 255) at the center
-    def makeHumanCostMap():
-        pass
     
     # Gets the start and end point from user input and stores them
     def getStartAndGoalInput(self):
@@ -461,11 +484,13 @@ class AStarMapSolver(Node):
             new_y = start_pixel[1] + self.step_size*y_vel*self.timestep
             new_y = int(self.search_loc_thresh * round(new_y/self.search_loc_thresh))
 
-            # TODO: Here we could add the check to see if the new pixel and the previous pixel are connected
-            # TODO: In the map making function create a set if acceptable nodes within the prm then check if the node exists
-            # TODO: Also create a dictionary that has the n nearest neighbors for each node
-            # Technically we should just search that graph but it's much too late to rewrite the entire codebase
-            
+            # print(str([new_y, new_x]))
+
+            # Check if the new pixel is in the pregenerated roadmap graph and skip if it's not
+            if self.use_prm:
+                if not str([new_y, new_x]) in self.prm_array:
+                    continue
+
             ang_vel = self.robot_wheel_rad/self.robot_wheel_dist * (move[1] - move[0])
 
             # print(x_vel, y_vel, ang_vel)
@@ -531,8 +556,6 @@ class AStarMapSolver(Node):
             # print("Cost to come: {}".format(cost_to_come))
             # print("Cost to go: {}".format(cost_to_go))
 
-
-            # TODO: Add in human cost here
             total_cost = self.c2g_weight*cost_to_go + cost_to_come 
             
             # Check if the configuration is in the list of working configs and grab it's current cost if it is
@@ -727,6 +750,9 @@ class AStarMapSolver(Node):
         cv2.imshow("Exploration map", show_map)
         cv2.waitKey(0)
 
+        # while not cv2.waitKey(0) == ord("q"):
+        #     print("nope")
+
         # Create blank path message
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
@@ -793,7 +819,7 @@ def main(args=None):
     #     rclpy.shutdown()
 
     rclpy.init(args=args)
-    node = AStarMapSolver(record_video=False, c2g_weight=2, use_lines=True, save_every_n_frames=10)
+    node = AStarMapSolver(record_video=False, c2g_weight=2, use_lines=True, save_every_n_frames=10, use_prm=True)
     try:
         node.findPath()
     finally:
